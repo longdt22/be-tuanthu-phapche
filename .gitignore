@@ -1,0 +1,60 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.next
+pom.xml.versionsBackup
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/.maven-wrapper.properties
+
+# Avoid ignoring Maven wrapper jar file (.jar extension)
+!/.mvn/wrapper/maven-wrapper.jar
+
+# Avoid ignoring Maven wrapper sh/cmd files
+!/mvnw
+!/mvnw.cmd
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# Eclipse
+.metadata
+bin/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~
+.settings/
+.loadpath
+.project
+.classpath
+.factorypath
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Agent artifacts
+implementation_plan.md
+walkthrough.md
+task.md
