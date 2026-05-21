@@ -24,4 +24,12 @@ public class ApiResponseWrapper<T> {
                 .message(message)
                 .build();
     }
+
+    public static <T> ApiResponseWrapper<T> error(String message, T data) {
+        return ApiResponseWrapper.<T>builder()
+                .success(false)
+                .message(message)
+                .data(data)
+                .build();
+    }
 }

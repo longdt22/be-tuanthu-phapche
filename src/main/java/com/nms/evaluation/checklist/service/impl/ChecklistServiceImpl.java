@@ -7,20 +7,39 @@ import com.nms.evaluation.checklist.dto.ChecklistResponse;
 import com.nms.evaluation.checklist.entity.Checklist;
 import com.nms.evaluation.checklist.enums.ChecklistStatus;
 import com.nms.evaluation.checklist.entity.Criteria;
+import com.nms.evaluation.checklist.enums.ApplicabilityLevel;
 import com.nms.evaluation.checklist.exception.ChecklistNotFoundException;
 import com.nms.evaluation.checklist.exception.DuplicateChecklistNameException;
+import com.nms.evaluation.checklist.exception.ExcelImportException;
 import com.nms.evaluation.checklist.mapper.ChecklistMapper;
 import com.nms.evaluation.checklist.repository.ChecklistRepository;
 import com.nms.evaluation.checklist.repository.CriteriaRepository;
 import com.nms.evaluation.checklist.service.ChecklistService;
 import com.nms.evaluation.checklist.specification.ChecklistSpecification;
 import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +54,237 @@ public class ChecklistServiceImpl implements ChecklistService {
 
     private final ChecklistRepository checklistRepository;
     private final CriteriaRepository criteriaRepository;
+
+    @Override
+    public Resource getImportTemplate() {
+        Resource resource = new ClassPathResource("template/import/template_checklist.xlsx");
+        if (!resource.exists()) {
+            throw new ChecklistNotFoundException("Tệp tin mẫu template_checklist.xlsx không tồn tại");
+        }
+        return resource;
+    }
+
+    @Override
+    public List<CriteriaResponse> importCriteria(MultipartFile file) {
+        try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
+            Sheet sheet = workbook.getSheetAt(0);
+            int startRow = 3; // Dữ liệu bắt đầu từ dòng 4 (chỉ số 3)
+            int lastRow = sheet.getLastRowNum();
+        // Create cell styles for result column
+        CellStyle headerCellStyle = workbook.createCellStyle();
+        headerCellStyle.setFillForegroundColor(IndexedColors.LIGHT_GREEN.getIndex());
+        headerCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        // Add borders to header style
+        headerCellStyle.setBorderTop(BorderStyle.THIN);
+        headerCellStyle.setBorderBottom(BorderStyle.THIN);
+        headerCellStyle.setBorderLeft(BorderStyle.THIN);
+        headerCellStyle.setBorderRight(BorderStyle.THIN);
+
+        CellStyle resultCellStyle = workbook.createCellStyle();
+        resultCellStyle.setBorderTop(BorderStyle.THIN);
+        resultCellStyle.setBorderBottom(BorderStyle.THIN);
+        resultCellStyle.setBorderLeft(BorderStyle.THIN);
+        resultCellStyle.setBorderRight(BorderStyle.THIN);
+        resultCellStyle.setWrapText(true);
+
+            if (lastRow < startRow) {
+                throw new ExcelImportException("File không có dữ liệu để import", null);
+            }
+
+            List<CriteriaResponse> resultList = new ArrayList<>();
+            boolean hasError = false;
+
+            for (int i = startRow; i <= lastRow; i++) {
+                Row row = sheet.getRow(i);
+                if (row == null || isEmptyRow(row)) {
+                    continue;
+                }
+
+                List<String> rowErrors = new ArrayList<>();
+
+                // Cột A (1) - Lĩnh vực: bắt buộc, tối đa 500 ký tự
+                String domain = getCellStringValue(row, 0);
+                validateRequired(domain, 1, rowErrors);
+                validateMaxLength(domain, 500, 1, rowErrors);
+
+                // Cột B (2) - Nhóm văn bản: bắt buộc, số Long
+                String documentGroupStr = getCellStringValue(row, 1);
+                Long documentGroup = validateRequiredLong(documentGroupStr, 2, rowErrors);
+
+                // Cột C (3) - Nhóm nghĩa vụ tổng quát: bắt buộc, số Long
+                String generalObligationGroupStr = getCellStringValue(row, 2);
+                Long generalObligationGroup = validateRequiredLong(generalObligationGroupStr, 3, rowErrors);
+
+                // Cột D (4) - Nhóm nghĩa vụ chi tiết: bắt buộc, số Long
+                String detailObligationGroupStr = getCellStringValue(row, 3);
+                Long detailObligationGroup = validateRequiredLong(detailObligationGroupStr, 4, rowErrors);
+
+                // Cột E (5) - Đơn vị đánh giá: bắt buộc, số Long
+                String evaluationUnitStr = getCellStringValue(row, 4);
+                Long evaluationUnit = validateRequiredLong(evaluationUnitStr, 5, rowErrors);
+
+                // Cột F (6) - Nội dung nghĩa vụ tuân thủ: tối đa 500 ký tự
+                String complianceObligation = getCellStringValue(row, 5);
+                validateMaxLength(complianceObligation, 500, 6, rowErrors);
+
+                // Cột G (7) - Căn cứ pháp lý: tối đa 500 ký tự
+                String obligationLegalBasis = getCellStringValue(row, 6);
+                validateMaxLength(obligationLegalBasis, 500, 7, rowErrors);
+
+                // Cột H (8) - Đánh giá áp dụng: bắt buộc, enum ApplicabilityLevel
+                String applicabilityLevelStr = getCellStringValue(row, 7);
+                ApplicabilityLevel applicabilityLevel = null;
+                if (applicabilityLevelStr == null || applicabilityLevelStr.trim().isEmpty()) {
+                    rowErrors.add("cột [8] không được bỏ trống");
+                } else {
+                    try {
+                        applicabilityLevel = ApplicabilityLevel.fromValue(applicabilityLevelStr.trim());
+                    } catch (IllegalArgumentException e) {
+                        rowErrors.add("cột [8] giá trị không hợp lệ");
+                    }
+                }
+
+                // Cột I (9) - Giấy phép: tối đa 500 ký tự
+                String license = getCellStringValue(row, 8);
+                validateMaxLength(license, 500, 9, rowErrors);
+
+                // Cột J (10) - Chế tài: tối đa 500 ký tự
+                String sanction = getCellStringValue(row, 9);
+                validateMaxLength(sanction, 500, 10, rowErrors);
+
+                // Cột K (11) - Hình phạt: tối đa 500 ký tự
+                String sanctionLegalBasis = getCellStringValue(row, 10);
+                validateMaxLength(sanctionLegalBasis, 500, 11, rowErrors);
+
+                // Ghi lỗi vào cột L (chỉ số 11) nếu có
+                if (!rowErrors.isEmpty()) {
+                    hasError = true;
+                    Cell errorCell = row.createCell(11);
+                    String bulletJoined = "• " + String.join("\n• ", rowErrors);
+                    errorCell.setCellValue(bulletJoined);
+                    errorCell.setCellStyle(resultCellStyle);
+                }
+
+                // Nếu dòng hợp lệ, tạo CriteriaResponse
+                if (rowErrors.isEmpty()) {
+                    CriteriaResponse response = CriteriaResponse.builder()
+                            .domain(domain)
+                            .documentGroup(documentGroup)
+                            .generalObligationGroup(generalObligationGroup)
+                            .detailObligationGroup(detailObligationGroup)
+                            .evaluationUnit(evaluationUnit)
+                            .complianceObligation(complianceObligation)
+                            .obligationLegalBasis(obligationLegalBasis)
+                            .applicabilityLevel(applicabilityLevel)
+                            .license(license)
+                            .sanction(sanction)
+                            .sanctionLegalBasis(sanctionLegalBasis)
+                            .build();
+                    resultList.add(response);
+                }
+            }
+
+            if (hasError) {
+                // Thêm tiêu đề cột Kết quả vào dòng header (dòng 3, chỉ số 2)
+                Row headerRow = sheet.getRow(2);
+                if (headerRow != null) {
+                    Cell headerErrorCell = headerRow.createCell(11);
+                    headerErrorCell.setCellValue("Kết quả");
+                    headerErrorCell.setCellStyle(headerCellStyle);
+                }
+
+                // Xuất workbook ra Base64
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                workbook.write(baos);
+                String base64 = Base64.getEncoder().encodeToString(baos.toByteArray());
+                throw new ExcelImportException("File import có lỗi dữ liệu, vui lòng kiểm tra lại", base64);
+            }
+
+            return resultList;
+        } catch (ExcelImportException e) {
+            throw e; // Re-throw our custom exception
+        } catch (IOException e) {
+            throw new ExcelImportException("Không thể đọc file Excel: " + e.getMessage(), null);
+        } catch (Exception e) {
+            throw new ExcelImportException("Lỗi xử lý file Excel: " + e.getMessage(), null);
+        }
+    }
+
+    // ==================== Import Helper Methods ====================
+
+    private boolean isEmptyRow(Row row) {
+        for (int i = 0; i <= 10; i++) {
+            Cell cell = row.getCell(i);
+            if (cell != null && cell.getCellType() != CellType.BLANK) {
+                String val = getCellStringValue(row, i);
+                if (val != null && !val.trim().isEmpty()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private String getCellStringValue(Row row, int colIndex) {
+        Cell cell = row.getCell(colIndex);
+        if (cell == null) {
+            return null;
+        }
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getStringCellValue();
+            case NUMERIC:
+                double numVal = cell.getNumericCellValue();
+                if (numVal == Math.floor(numVal) && !Double.isInfinite(numVal)) {
+                    return String.valueOf((long) numVal);
+                }
+                return String.valueOf(numVal);
+            case BOOLEAN:
+                return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA:
+                try {
+                    return cell.getStringCellValue();
+                } catch (Exception e) {
+                    try {
+                        double fVal = cell.getNumericCellValue();
+                        if (fVal == Math.floor(fVal) && !Double.isInfinite(fVal)) {
+                            return String.valueOf((long) fVal);
+                        }
+                        return String.valueOf(fVal);
+                    } catch (Exception e2) {
+                        return null;
+                    }
+                }
+            case BLANK:
+            default:
+                return null;
+        }
+    }
+
+    private void validateRequired(String value, int colIndex, List<String> errors) {
+        if (value == null || value.trim().isEmpty()) {
+            errors.add("cột [" + colIndex + "] không được bỏ trống");
+        }
+    }
+
+    private void validateMaxLength(String value, int maxLength, int colIndex, List<String> errors) {
+        if (value != null && value.length() > maxLength) {
+            errors.add("Số ký tự cột [" + colIndex + "] không hợp lệ");
+        }
+    }
+
+    private Long validateRequiredLong(String value, int colIndex, List<String> errors) {
+        if (value == null || value.trim().isEmpty()) {
+            errors.add("cột [" + colIndex + "] không được bỏ trống");
+            return null;
+        }
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException e) {
+            errors.add("cột [" + colIndex + "] không đúng định dạng số");
+            return null;
+        }
+    }
 
     @Override
     @Transactional

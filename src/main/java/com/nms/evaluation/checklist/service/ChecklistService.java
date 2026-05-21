@@ -5,10 +5,17 @@ import com.nms.evaluation.checklist.dto.CriteriaResponse;
 import com.nms.evaluation.checklist.dto.ChecklistRequest;
 import com.nms.evaluation.checklist.dto.ChecklistResponse;
 import com.nms.evaluation.checklist.enums.ChecklistStatus;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
 
 public interface ChecklistService {
+
+    Resource getImportTemplate();
+
+    List<CriteriaResponse> importCriteria(MultipartFile file);
 
     // Checklist Operations
     ChecklistResponse createChecklist(ChecklistRequest request, String currentUser);

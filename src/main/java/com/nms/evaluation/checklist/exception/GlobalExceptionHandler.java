@@ -18,6 +18,13 @@ public class GlobalExceptionHandler {
                 .body(ApiResponseWrapper.error(ex.getMessage()));
     }
 
+    @ExceptionHandler(ExcelImportException.class)
+    public ResponseEntity<ApiResponseWrapper<java.util.Map<String, String>>> handleExcelImport(ExcelImportException ex) {
+        java.util.Map<String, String> data = java.util.Map.of("errorFile", ex.getErrorFileBase64());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponseWrapper.error(ex.getMessage(), data));
+    }
+
     @ExceptionHandler(DuplicateChecklistNameException.class)
     public ResponseEntity<ApiResponseWrapper<Void>> handleDuplicate(DuplicateChecklistNameException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
