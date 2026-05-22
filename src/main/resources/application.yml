@@ -7,6 +7,13 @@ spring:
   application:
     name: evaluation-service
 
+  # Keycloak Security Configuration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://keycloak.dev.nms.com.vn/realms/tuan-thu-phap-che
+
   # Datasource Configuration for MySQL
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:192.168.88.6}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:adms_tuanthu}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
