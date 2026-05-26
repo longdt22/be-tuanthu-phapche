@@ -8,8 +8,7 @@ import com.nms.evaluation.checklist.entity.Checklist;
 import com.nms.evaluation.checklist.enums.ChecklistStatus;
 import com.nms.evaluation.checklist.entity.Criteria;
 import com.nms.evaluation.checklist.enums.ApplicabilityLevel;
-import com.nms.evaluation.checklist.exception.ChecklistNotFoundException;
-import com.nms.evaluation.checklist.exception.DuplicateChecklistNameException;
+import com.nms.evaluation.checklist.exception.BusinessException;
 import com.nms.evaluation.checklist.exception.ExcelImportException;
 import com.nms.evaluation.checklist.mapper.ChecklistMapper;
 import com.nms.evaluation.checklist.repository.ChecklistRepository;
@@ -59,7 +58,7 @@ public class ChecklistServiceImpl implements ChecklistService {
     public Resource getImportTemplate() {
         Resource resource = new ClassPathResource("template/import/template_checklist.xlsx");
         if (!resource.exists()) {
-            throw new ChecklistNotFoundException("Tệp tin mẫu template_checklist.xlsx không tồn tại");
+            throw BusinessException.notFound("Tệp tin mẫu template_checklist.xlsx không tồn tại");
         }
         return resource;
     }
@@ -291,7 +290,7 @@ public class ChecklistServiceImpl implements ChecklistService {
     public ChecklistResponse createChecklist(ChecklistRequest request, String currentUser) {
         // Business Rule 1: Checklist name must be unique
         if (checklistRepository.existsByName(request.getName())) {
-            throw new DuplicateChecklistNameException("Tên check list tồn tại vui lòng thử lại");
+            throw BusinessException.badRequest("Tên check list tồn tại vui lòng thử lại");
         }
 
         Checklist checklist = Checklist.builder()
@@ -318,7 +317,7 @@ public class ChecklistServiceImpl implements ChecklistService {
     @Override
     public ChecklistResponse getChecklistById(Long id) {
         Checklist checklist = checklistRepository.findById(id)
-                .orElseThrow(() -> new ChecklistNotFoundException("Checklist with ID " + id + " not found"));
+                .orElseThrow(() -> BusinessException.notFound("Checklist with ID " + id + " not found"));
         return ChecklistMapper.toResponse(checklist);
     }
 
@@ -336,11 +335,11 @@ public class ChecklistServiceImpl implements ChecklistService {
     @Transactional
     public ChecklistResponse updateChecklist(Long id, ChecklistRequest request, String currentUser) {
         Checklist checklist = checklistRepository.findById(id)
-                .orElseThrow(() -> new ChecklistNotFoundException("Checklist with ID " + id + " not found"));
+                .orElseThrow(() -> BusinessException.notFound("Checklist with ID " + id + " not found"));
 
         // Name uniqueness check (excluding self)
         if (checklistRepository.existsByNameAndIdNot(request.getName(), id)) {
-            throw new DuplicateChecklistNameException("tên check list tồn tại vui lòng thử lại");
+            throw BusinessException.badRequest("tên check list tồn tại vui lòng thử lại");
         }
 
         checklist.setName(request.getName());
@@ -400,7 +399,7 @@ public class ChecklistServiceImpl implements ChecklistService {
     @Transactional
     public ChecklistResponse changeStatus(Long id, ChecklistStatus status, String currentUser) {
         Checklist checklist = checklistRepository.findById(id)
-                .orElseThrow(() -> new ChecklistNotFoundException("Checklist with ID " + id + " not found"));
+                .orElseThrow(() -> BusinessException.notFound("Checklist with ID " + id + " not found"));
 
         checklist.setStatus(status);
         checklist.setUpdatedBy(currentUser);
@@ -413,7 +412,7 @@ public class ChecklistServiceImpl implements ChecklistService {
     @Transactional
     public void deleteChecklist(Long id, String currentUser) {
         Checklist checklist = checklistRepository.findById(id)
-                .orElseThrow(() -> new ChecklistNotFoundException("Checklist with ID " + id + " not found"));
+                .orElseThrow(() -> BusinessException.notFound("Checklist with ID " + id + " not found"));
 
         // Rule: Applied checklist cannot be deleted physically.
         if (checklist.getStatus() == ChecklistStatus.APPLIED) {
@@ -431,7 +430,7 @@ public class ChecklistServiceImpl implements ChecklistService {
     @Transactional
     public CriteriaResponse createItem(Long checklistId, CriteriaRequest request) {
         Checklist checklist = checklistRepository.findById(checklistId)
-                .orElseThrow(() -> new ChecklistNotFoundException("Checklist with ID " + checklistId + " not found"));
+                .orElseThrow(() -> BusinessException.notFound("Checklist with ID " + checklistId + " not found"));
 
         Criteria item = ChecklistMapper.toEntity(request);
         item.setId(null); // Force ID to null for direct creation
@@ -445,7 +444,7 @@ public class ChecklistServiceImpl implements ChecklistService {
     @Transactional
     public CriteriaResponse updateItem(Long itemId, CriteriaRequest request) {
         Criteria item = criteriaRepository.findById(itemId)
-                .orElseThrow(() -> new ChecklistNotFoundException("Criteria with ID " + itemId + " not found"));
+                .orElseThrow(() -> BusinessException.notFound("Criteria with ID " + itemId + " not found"));
 
         item.setDomain(request.getDomain());
         item.setDocumentGroup(request.getDocumentGroup());
@@ -467,7 +466,7 @@ public class ChecklistServiceImpl implements ChecklistService {
     @Transactional
     public void deleteItem(Long itemId) {
         Criteria item = criteriaRepository.findById(itemId)
-                .orElseThrow(() -> new ChecklistNotFoundException("Criteria with ID " + itemId + " not found"));
+                .orElseThrow(() -> BusinessException.notFound("Criteria with ID " + itemId + " not found"));
 
         Checklist checklist = item.getChecklistId();
         if (checklist != null) {

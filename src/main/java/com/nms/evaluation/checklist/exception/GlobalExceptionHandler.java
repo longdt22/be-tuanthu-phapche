@@ -12,9 +12,9 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ChecklistNotFoundException.class)
-    public ResponseEntity<ApiResponseWrapper<Void>> handleNotFound(ChecklistNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ApiResponseWrapper<Void>> handleBusinessException(BusinessException ex) {
+        return ResponseEntity.status(ex.getStatus())
                 .body(ApiResponseWrapper.error(ex.getMessage()));
     }
 
@@ -23,18 +23,6 @@ public class GlobalExceptionHandler {
         java.util.Map<String, String> data = java.util.Map.of("errorFile", ex.getErrorFileBase64());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponseWrapper.error(ex.getMessage(), data));
-    }
-
-    @ExceptionHandler(DuplicateChecklistNameException.class)
-    public ResponseEntity<ApiResponseWrapper<Void>> handleDuplicate(DuplicateChecklistNameException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponseWrapper.error(ex.getMessage()));
-    }
-
-    @ExceptionHandler(InvalidChecklistStatusException.class)
-    public ResponseEntity<ApiResponseWrapper<Void>> handleInvalidStatus(InvalidChecklistStatusException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponseWrapper.error(ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
