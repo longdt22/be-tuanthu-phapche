@@ -25,4 +25,6 @@ public class ChecklistRequest {
 
     @Valid
     private List<CriteriaRequest> criteria;
+
+    private com.nms.evaluation.checklist.enums.ChecklistStatus status;
 }

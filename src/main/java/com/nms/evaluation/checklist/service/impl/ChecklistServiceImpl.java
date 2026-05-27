@@ -297,7 +297,7 @@ public class ChecklistServiceImpl implements ChecklistService {
                 .name(request.getName())
                 .description(request.getDescription())
                 .createdByUnit(request.getCreatedByUnit())
-                .status(ChecklistStatus.DRAFT) // starts as draft
+                .status(request.getStatus() != null ? request.getStatus() : ChecklistStatus.DRAFT)
                 .createdBy(currentUser)
                 .updatedBy(currentUser)
                 .build();
