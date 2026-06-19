@@ -4,6 +4,7 @@ import com.nms.evaluation.checklist.dto.CriteriaRequest;
 import com.nms.evaluation.checklist.dto.CriteriaResponse;
 import com.nms.evaluation.checklist.dto.ChecklistRequest;
 import com.nms.evaluation.checklist.dto.ChecklistResponse;
+import com.nms.evaluation.checklist.dto.EvaluationRequest;
 import com.nms.evaluation.checklist.entity.Checklist;
 import com.nms.evaluation.checklist.enums.ChecklistStatus;
 import com.nms.evaluation.checklist.entity.Criteria;
@@ -69,22 +70,22 @@ public class ChecklistServiceImpl implements ChecklistService {
             Sheet sheet = workbook.getSheetAt(0);
             int startRow = 3; // Dữ liệu bắt đầu từ dòng 4 (chỉ số 3)
             int lastRow = sheet.getLastRowNum();
-        // Create cell styles for result column
-        CellStyle headerCellStyle = workbook.createCellStyle();
-        headerCellStyle.setFillForegroundColor(IndexedColors.LIGHT_GREEN.getIndex());
-        headerCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        // Add borders to header style
-        headerCellStyle.setBorderTop(BorderStyle.THIN);
-        headerCellStyle.setBorderBottom(BorderStyle.THIN);
-        headerCellStyle.setBorderLeft(BorderStyle.THIN);
-        headerCellStyle.setBorderRight(BorderStyle.THIN);
+            // Create cell styles for result column
+            CellStyle headerCellStyle = workbook.createCellStyle();
+            headerCellStyle.setFillForegroundColor(IndexedColors.LIGHT_GREEN.getIndex());
+            headerCellStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            // Add borders to header style
+            headerCellStyle.setBorderTop(BorderStyle.THIN);
+            headerCellStyle.setBorderBottom(BorderStyle.THIN);
+            headerCellStyle.setBorderLeft(BorderStyle.THIN);
+            headerCellStyle.setBorderRight(BorderStyle.THIN);
 
-        CellStyle resultCellStyle = workbook.createCellStyle();
-        resultCellStyle.setBorderTop(BorderStyle.THIN);
-        resultCellStyle.setBorderBottom(BorderStyle.THIN);
-        resultCellStyle.setBorderLeft(BorderStyle.THIN);
-        resultCellStyle.setBorderRight(BorderStyle.THIN);
-        resultCellStyle.setWrapText(true);
+            CellStyle resultCellStyle = workbook.createCellStyle();
+            resultCellStyle.setBorderTop(BorderStyle.THIN);
+            resultCellStyle.setBorderBottom(BorderStyle.THIN);
+            resultCellStyle.setBorderLeft(BorderStyle.THIN);
+            resultCellStyle.setBorderRight(BorderStyle.THIN);
+            resultCellStyle.setWrapText(true);
 
             if (lastRow < startRow) {
                 throw new ExcelImportException("File không có dữ liệu để import", null);
@@ -402,6 +403,68 @@ public class ChecklistServiceImpl implements ChecklistService {
                 .orElseThrow(() -> BusinessException.notFound("Checklist with ID " + id + " not found"));
 
         checklist.setStatus(status);
+        checklist.setUpdatedBy(currentUser);
+
+        Checklist saved = checklistRepository.save(checklist);
+        return ChecklistMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ChecklistResponse submitEvaluation(Long id, String currentUser) {
+        Checklist checklist = checklistRepository.findById(id)
+                .orElseThrow(() -> BusinessException.notFound("Checklist with ID " + id + " not found"));
+
+        if (checklist.getStatus() != ChecklistStatus.DRAFT) {
+            throw BusinessException.badRequest("Checklist không ở trạng thái Nháp");
+        }
+
+        List<Criteria> criterias = checklist.getCriterias();
+        if (criterias == null || criterias.isEmpty()) {
+            throw BusinessException.badRequest("Checklist phải có ít nhất 1 tiêu chí");
+        }
+
+        Set<String> domains = criterias.stream()
+                .map(Criteria::getDomain)
+                .filter(d -> d != null && !d.trim().isEmpty())
+                .map(String::trim)
+                .collect(Collectors.toSet());
+
+        if (!domains.isEmpty()) {
+            boolean isDuplicate = checklistRepository.existsDuplicateChecklist(
+                    id,
+                    checklist.getName(),
+                    domains,
+                    List.of(ChecklistStatus.PENDING_APPROVAL, ChecklistStatus.APPLIED));
+            if (isDuplicate) {
+                throw BusinessException.badRequest("Trùng tên + lĩnh vực với checklist khác đã tồn tại");
+            }
+        }
+
+        checklist.setStatus(ChecklistStatus.PENDING_APPROVAL);
+        checklist.setUpdatedBy(currentUser);
+
+        Checklist saved = checklistRepository.save(checklist);
+        return ChecklistMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ChecklistResponse evaluateChecklist(Long id, EvaluationRequest request, String currentUser) {
+        Checklist checklist = checklistRepository.findById(id)
+                .orElseThrow(() -> BusinessException.notFound("Checklist with ID " + id + " not found"));
+
+        if (checklist.getStatus() != ChecklistStatus.PENDING_APPROVAL) {
+            throw BusinessException.badRequest("Checklist không ở trạng thái Chờ thẩm định");
+        }
+
+        if ("APPROVE".equalsIgnoreCase(request.getResult())) {
+            checklist.setStatus(ChecklistStatus.PENDING_SIGNATURE);
+        } else {
+            checklist.setStatus(ChecklistStatus.DRAFT);
+        }
+
+        checklist.setEvaluationComment(request.getComment());
         checklist.setUpdatedBy(currentUser);
 
         Checklist saved = checklistRepository.save(checklist);

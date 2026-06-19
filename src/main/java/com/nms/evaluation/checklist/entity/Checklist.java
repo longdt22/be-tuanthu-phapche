@@ -59,6 +59,9 @@ public class Checklist {
 
     private LocalDateTime updatedAt;
 
+    @Column(name = "evaluation_comment", length = 1000)
+    private String evaluationComment;
+
     @Builder.Default
     @OneToMany(mappedBy = "checklistId", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Criteria> criterias = new ArrayList<>();

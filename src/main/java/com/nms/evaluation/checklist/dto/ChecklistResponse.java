@@ -21,5 +21,6 @@ public class ChecklistResponse {
     private Integer createdByUnit;
     private String updatedBy;
     private LocalDateTime updatedAt;
+    private String evaluationComment;
     private List<CriteriaResponse> criteria;
 }

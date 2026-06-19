@@ -27,6 +27,7 @@ public class ChecklistMapper {
                 .createdByUnit(checklist.getCreatedByUnit())
                 .updatedBy(checklist.getUpdatedBy())
                 .updatedAt(checklist.getUpdatedAt())
+                .evaluationComment(checklist.getEvaluationComment())
                 .criteria(checklist.getCriterias() == null ? new ArrayList<>()
                         : checklist.getCriterias().stream()
                                 .map(ChecklistMapper::toItemResponse)

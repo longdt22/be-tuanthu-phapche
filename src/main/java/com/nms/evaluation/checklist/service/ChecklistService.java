@@ -4,6 +4,7 @@ import com.nms.evaluation.checklist.dto.CriteriaRequest;
 import com.nms.evaluation.checklist.dto.CriteriaResponse;
 import com.nms.evaluation.checklist.dto.ChecklistRequest;
 import com.nms.evaluation.checklist.dto.ChecklistResponse;
+import com.nms.evaluation.checklist.dto.EvaluationRequest;
 import com.nms.evaluation.checklist.enums.ChecklistStatus;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
@@ -28,6 +29,10 @@ public interface ChecklistService {
     ChecklistResponse updateChecklist(Long id, ChecklistRequest request, String currentUser);
 
     ChecklistResponse changeStatus(Long id, ChecklistStatus status, String currentUser);
+
+    ChecklistResponse submitEvaluation(Long id, String currentUser);
+
+    ChecklistResponse evaluateChecklist(Long id, EvaluationRequest request, String currentUser);
 
     void deleteChecklist(Long id, String currentUser);
 

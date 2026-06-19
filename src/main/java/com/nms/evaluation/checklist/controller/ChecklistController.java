@@ -5,6 +5,7 @@ import com.nms.evaluation.checklist.dto.CriteriaRequest;
 import com.nms.evaluation.checklist.dto.CriteriaResponse;
 import com.nms.evaluation.checklist.dto.ChecklistRequest;
 import com.nms.evaluation.checklist.dto.ChecklistResponse;
+import com.nms.evaluation.checklist.dto.EvaluationRequest;
 import com.nms.evaluation.checklist.dto.PageResponse;
 import com.nms.evaluation.checklist.enums.ChecklistStatus;
 import com.nms.evaluation.checklist.service.ChecklistService;
@@ -118,6 +119,29 @@ public class ChecklistController {
 
         String user = resolveUser(userHeader);
         ChecklistResponse response = checklistService.changeStatus(id, status, user);
+        return ResponseEntity.ok(ApiResponseWrapper.success(response));
+    }
+
+    @PostMapping("/{id}/submit-evaluation")
+    @Operation(summary = "Gửi checklist lên bộ phận Pháp chế thẩm định")
+    public ResponseEntity<ApiResponseWrapper<ChecklistResponse>> submitEvaluation(
+            @PathVariable Long id,
+            @RequestHeader(value = "X-User", required = false) String userHeader) {
+
+        String user = resolveUser(userHeader);
+        ChecklistResponse response = checklistService.submitEvaluation(id, user);
+        return ResponseEntity.ok(ApiResponseWrapper.success(response));
+    }
+
+    @PostMapping("/{id}/evaluate")
+    @Operation(summary = "Thẩm định checklist (APPROVE đạt / REJECT từ chối)")
+    public ResponseEntity<ApiResponseWrapper<ChecklistResponse>> evaluateChecklist(
+            @PathVariable Long id,
+            @Valid @RequestBody EvaluationRequest request,
+            @RequestHeader(value = "X-User", required = false) String userHeader) {
+
+        String user = resolveUser(userHeader);
+        ChecklistResponse response = checklistService.evaluateChecklist(id, request, user);
         return ResponseEntity.ok(ApiResponseWrapper.success(response));
     }
 
